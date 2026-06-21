@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mostrador · CRM de proveedores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#E8E8E4;
+    --card:#FBFBF9;
+    --card-2:#FFFFFF;
+    --line:#E4E4DE;
+    --line-soft:#EDEDE8;
+    --ink:#1A1A18;
+    --ink-soft:#73736C;
+    --ink-faint:#9B9B92;
+    --badge:#1A1A18;
+    --accent:#1A1A18;
+    --ok:#2C8A57;
+    --up:#C8553A;
+    --radius:20px;
+    --radius-sm:13px;
+    --font-display:"Inter Tight", sans-serif;
+    --font-body:"Inter", sans-serif;
+    --font-mono:"Inter", sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--font-body);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);background:var(--card-2);border:1px solid var(--line);border-radius:11px;padding:10px 13px;width:100%}
+  input::placeholder,textarea::placeholder{color:var(--ink-faint)}
+  input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  .mono{font-variant-numeric:tabular-nums;letter-spacing:0}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+  /* ---------- estructura ---------- */
+  .page{max-width:1180px;margin:0 auto;padding:22px 22px 70px}
+
+  /* hero superior con la navegación (firma de la referencia) */
+  .hero{background:var(--card);border-radius:26px;padding:26px 30px 24px;margin-bottom:18px}
+  .hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+  .brand{font-family:var(--font-display);font-weight:700;font-size:26px;letter-spacing:-0.03em;display:flex;align-items:center;gap:9px}
+  .brand .wave{font-size:23px}
+  .nav{display:grid;grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:7px 32px}
+  .nav button{display:flex;align-items:center;gap:11px;background:none;border:none;color:var(--ink);padding:5px 4px;font-size:15px;font-weight:500;letter-spacing:-0.01em;border-radius:8px;transition:opacity .15s}
+  .nav button .badge{width:26px;height:26px;border-radius:50%;background:var(--badge);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;transition:transform .15s}
+  .nav button:hover{opacity:.62}
+  .nav button.active .badge{background:var(--badge)}
+  .nav button:not(.active) .badge{background:#C9C9C2}
+  .nav button.active{font-weight:600}
+  .hero-intro{font-family:var(--font-display);font-weight:500;font-size:25px;line-height:1.28;letter-spacing:-0.02em;max-width:620px;margin-top:30px;color:var(--ink)}
+  .hero-intro .soft{color:var(--ink-faint)}
+  .hero-foot{display:flex;align-items:center;gap:10px;margin-top:22px;flex-wrap:wrap}
+
+  .conn{font-size:12.5px;color:var(--ink-soft);display:inline-flex;align-items:center;background:var(--card-2);border:1px solid var(--line);padding:6px 13px;border-radius:999px}
+  .conn b{color:var(--ink);font-weight:600}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--ink-faint)}
+  .dot.on{background:var(--ok)}
+
+  .main{}
+  .demo-banner{background:#FCF4DD;border:1px solid #EBD89B;border-radius:var(--radius-sm);padding:13px 17px;font-size:13.5px;margin-bottom:18px;color:#6B5818}
+  .demo-banner b{font-weight:600}
+
+  .topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  .topbar h1{font-family:var(--font-display);font-weight:700;font-size:30px;letter-spacing:-0.03em}
+  .topbar p{color:var(--ink-soft);font-size:14.5px;margin-top:3px}
+
+  /* ---------- botones ---------- */
+  .btn{border:none;border-radius:11px;padding:11px 18px;font-weight:600;font-size:14px;letter-spacing:-0.01em;transition:transform .12s,opacity .15s}
+  .btn:active{transform:scale(.97)}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{opacity:.85}
+  .btn-ghost{background:var(--card-2);border:1px solid var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink-faint)}
+  .btn-danger{background:transparent;border:1px solid #E6C3B8;color:var(--up)}
+  .btn-danger:hover{background:#F8E9E3}
+  .btn-sm{padding:7px 13px;font-size:13px;border-radius:9px}
+
+  /* ---------- KPIs ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:14px;margin-bottom:18px}
+  .kpi{background:var(--card);border-radius:var(--radius);padding:20px 22px}
+  .kpi .label{font-size:12px;letter-spacing:.01em;color:var(--ink-soft);font-weight:500}
+  .kpi .value{font-family:var(--font-display);font-size:34px;font-weight:700;letter-spacing:-0.03em;margin-top:10px;font-variant-numeric:tabular-nums}
+  .kpi .sub{font-size:12.5px;color:var(--ink-faint);margin-top:4px}
+
+  /* ---------- paneles ---------- */
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:980px){.panels{grid-template-columns:1fr}}
+  .panel{background:var(--card);border-radius:var(--radius);padding:22px 24px}
+  .panel h3{font-family:var(--font-display);font-size:17px;font-weight:600;letter-spacing:-0.02em;margin-bottom:15px;display:flex;align-items:center;justify-content:space-between}
+  .panel h3 .count{font-size:12.5px;color:var(--ink-faint);font-weight:400;font-variant-numeric:tabular-nums}
+  .empty{color:var(--ink-faint);font-size:13.5px;padding:16px 0;text-align:center}
+
+  .rowline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px}
+  .rowline:last-child{border-bottom:none}
+  .rowline .who{color:var(--ink-faint);font-size:12.5px;margin-top:1px}
+  .up{color:var(--up);font-weight:600}
+  .down{color:var(--ok);font-weight:600}
+
+  .barrow{display:flex;align-items:center;gap:11px;padding:7px 0;font-size:13px}
+  .barrow .blabel{width:128px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-soft)}
+  .barrow .btrack{flex:1;background:var(--line);border-radius:999px;height:16px;overflow:hidden}
+  .barrow .bfill{height:100%;border-radius:999px}
+  .barrow .bnum{width:24px;text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+  .leadtime{font-size:12px;font-weight:600;background:var(--bg);color:var(--ink);border-radius:999px;padding:4px 11px;display:inline-block;width:fit-content;font-variant-numeric:tabular-nums}
+
+  /* ---------- etiquetas de categoría ---------- */
+  .tag{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:-0.01em;padding:4px 11px 4px 9px;border-radius:999px;color:var(--ink);background:var(--card-2);border:1px solid var(--line)}
+  .tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--g,#999)}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex;gap:11px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  .toolbar input[type=search]{max-width:280px;border-radius:999px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--card-2);border-radius:999px;padding:7px 15px;font-size:13px;font-weight:500;color:var(--ink-soft);transition:all .12s}
+  .chip:hover{border-color:var(--ink-faint)}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .spacer{flex:1}
+
+  /* ---------- cards de proveedores (con blob de degradé) ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .supcard{background:var(--card);border-radius:var(--radius);padding:14px 14px 18px;display:flex;flex-direction:column;gap:11px;transition:transform .16s,box-shadow .16s}
+  .supcard:hover{transform:translateY(-3px);box-shadow:0 14px 34px rgba(0,0,0,.08)}
+  .blob{height:96px;border-radius:15px;position:relative;overflow:hidden;flex-shrink:0}
+  .blob .blob-cat{position:absolute;top:11px;left:13px;font-size:11.5px;font-weight:600;letter-spacing:.01em;color:#fff;background:rgba(0,0,0,.22);backdrop-filter:blur(3px);padding:3px 10px;border-radius:999px}
+  .blob .blob-lead{position:absolute;bottom:11px;right:13px;font-size:11px;font-weight:600;color:#fff;background:rgba(0,0,0,.28);padding:3px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+  .supcard .body{padding:0 6px;display:flex;flex-direction:column;gap:9px}
+  .supcard h4{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-0.025em}
+  .supcard .meta{font-size:13px;color:var(--ink-soft);display:flex;flex-direction:column;gap:3px}
+  .supcard .meta span b{color:var(--ink);font-weight:600}
+  .supcard .actions{display:flex;gap:8px;margin-top:5px;padding:0 6px}
+
+  /* ---------- comparador de precios ---------- */
+  .prodcard{background:var(--card);border-radius:var(--radius);padding:20px 22px;margin-bottom:13px}
+  .prodcard .phead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+  .prodcard .phead h4{font-family:var(--font-display);font-size:18px;font-weight:700;letter-spacing:-0.02em}
+  .prodcard .phead .unit{font-size:13px;color:var(--ink-faint);font-weight:400}
+  .pricegrid{display:flex;flex-wrap:wrap;gap:10px}
+  .pricechip{border:1px solid var(--line);border-radius:13px;padding:11px 15px;min-width:155px;background:var(--card-2)}
+  .pricechip.best{border-color:transparent;background:linear-gradient(135deg,#FFE8B0,#FFD27A)}
+  .pricechip .pv{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+  .pricechip .ps{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .pricechip .bestlabel{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#8A6512;font-weight:700;margin-bottom:2px}
+
+  /* ---------- tablas ---------- */
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden}
+  th{font-size:11.5px;letter-spacing:.02em;color:var(--ink-soft);text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);font-weight:600}
+  td{padding:13px 16px;border-bottom:1px solid var(--line-soft);font-size:13.5px;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ---------- modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(26,26,24,.42);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50}
+  .overlay.open{display:flex}
+  .modal{background:var(--card);border-radius:24px;max-width:650px;width:100%;padding:28px 30px;box-shadow:0 30px 80px rgba(0,0,0,.28)}
+  .modal h2{font-family:var(--font-display);font-size:23px;font-weight:700;letter-spacing:-0.03em;margin-bottom:20px}
+  .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .formgrid .full{grid-column:1/-1}
+  label.fl{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
+  .modal .foot{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+  @media(max-width:560px){.formgrid{grid-template-columns:1fr}}
+
+  /* ---------- detalle proveedor ---------- */
+  .detail-block{margin-top:20px}
+  .detail-block h5{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-0.01em;margin-bottom:9px;color:var(--ink-soft)}
+
+  /* ---------- toast ---------- */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;font-weight:500;display:none;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  .toast.err{background:var(--up)}
+  .toast.show{display:block}
+
+  /* ---------- sparkline ---------- */
+  .spark{margin:10px 0 16px}
+
+  /* ---------- responsive ---------- */
+  @media(max-width:680px){
+    .page{padding:14px 13px 50px}
+    .hero{padding:22px 20px;border-radius:22px}
+    .hero-top{flex-direction:column;gap:18px}
+    .nav{grid-template-columns:1fr 1fr;gap:4px 18px}
+    .hero-intro{font-size:21px;margin-top:22px}
+    .topbar h1{font-size:25px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================================================================
+  CONFIGURACIÓN — completá estos dos valores con los datos de tu
+  proyecto de Supabase (Settings → API). Mientras estén vacíos, la app
+  funciona en MODO DEMO con datos de ejemplo que no se guardan.
+==================================================================== -->
+<script>
+  const SUPABASE_URL = "";        // ej: "https://abcdefgh.supabase.co"
+  const SUPABASE_ANON_KEY = "";   // la clave "anon public"
+</script>
+
+<div class="page">
+  <header class="hero">
+    <div class="hero-top">
+      <div class="brand">Mostrador <span class="wave">👋</span></div>
+      <nav class="nav" id="nav">
+        <button data-view="panel" class="active"><span class="badge">▦</span> Panel</button>
+        <button data-view="proveedores"><span class="badge">+</span> Proveedores</button>
+        <button data-view="precios"><span class="badge">$</span> Precios</button>
+        <button data-view="compras"><span class="badge">✓</span> Compras</button>
+        <button data-view="ajustes"><span class="badge">⚙</span> Ajustes</button>
+      </nav>
+    </div>
+    <p class="hero-intro" id="heroIntro">Tus proveedores, precios y pedidos ordenados en un solo lugar. <span class="soft">Pegá una conversación o subí un catálogo y la app carga los datos por vos.</span></p>
+    <div class="hero-foot">
+      <div class="conn" id="connBox"></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div id="demoBanner"></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBody"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   ESTADO Y CAPA DE DATOS
+========================================================= */
+const state = { proveedores: [], precios: [], compras: [] };
+let sb = null, isDemo = false, currentView = "panel";
+let filtroCategoria = "Todas", busqueda = "";
+
+const CATEGORIAS = ["Café","Lácteos","Panificados","Frutas y verduras","Bebidas","Almacén","Descartables","Limpieza","Equipamiento","Otros"];
+const CAT_PALETTE = ["#7A4A28","#3E6B8C","#C77F2A","#3F8A4E","#5E8CC4","#8C6D3E","#7A7A86","#3FA0B8","#C0503A","#9E6B8E"];
+// Degradés suaves por categoría (firma visual estilo referencia)
+const CAT_GRAD = {
+  "Café":              ["#D9A24C","#7A3E22"],
+  "Lácteos":           ["#A9C9EC","#4A6FB0"],
+  "Panificados":       ["#F6C95A","#E07B3A"],
+  "Frutas y verduras": ["#A6DC7E","#3F8A4E"],
+  "Bebidas":           ["#6FD0D6","#3E78B8"],
+  "Almacén":           ["#C7A6E6","#7A4D9E"],
+  "Descartables":      ["#C6C6CE","#74748A"],
+  "Limpieza":          ["#8FE0E6","#3FA0B8"],
+  "Equipamiento":      ["#F4A06A","#C0503A"],
+  "Otros":             ["#EBB0CC","#9E6B8E"],
+};
+function catColor(cat){
+  const i = CATEGORIAS.indexOf(cat);
+  if (i >= 0) return CAT_PALETTE[i];
+  let h = 0; for (const c of (cat||"")) h = (h*31 + c.charCodeAt(0)) % 997;
+  return CAT_PALETTE[h % CAT_PALETTE.length];
+}
+function catGrad(cat){
+  const g = CAT_GRAD[cat] || CAT_GRAD["Otros"];
+  // degradé tipo blob: radial cálido arriba-izq + lineal de base
+  return `radial-gradient(120% 120% at 28% 22%, ${g[0]} 0%, ${g[1]} 78%)`;
+}
+
+const fmtARS = new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",minimumFractionDigits:0,maximumFractionDigits:2});
+const fmtPct = n => (n>0?"+":"") + n.toFixed(1).replace(".",",") + "%";
+function fmtFecha(f){ if(!f) return "—"; const [y,m,d]=f.split("-"); return `${d}/${m}/${y}`; }
+function hoy(){ return new Date().toISOString().slice(0,10); }
+function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+async function initData(){
+  if (SUPABASE_URL && SUPABASE_ANON_KEY){
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    try { await fetchAll(); }
+    catch(e){ toast("No pude conectar con Supabase: " + e.message, true); }
+  } else {
+    isDemo = true;
+    loadDemoData();
+  }
+  renderConn();
+  renderBanner();
+  render();
+}
+
+async function fetchAll(){
+  const [p, pr, c] = await Promise.all([
+    sb.from("proveedores").select("*").order("nombre"),
+    sb.from("precios").select("*").order("fecha"),
+    sb.from("compras").select("*").order("fecha", {ascending:false}),
+  ]);
+  for (const r of [p,pr,c]) if (r.error) throw r.error;
+  state.proveedores = p.data; state.precios = pr.data; state.compras = c.data;
+}
+
+async function insertRow(tabla, fila){
+  if (isDemo){ fila.id = crypto.randomUUID(); state[tabla].push(fila); return fila; }
+  const {data, error} = await sb.from(tabla).insert(fila).select().single();
+  if (error) throw error;
+  state[tabla].push(data); return data;
+}
+async function updateRow(tabla, id, fila){
+  if (isDemo){ const i = state[tabla].findIndex(x=>x.id===id); state[tabla][i] = {...state[tabla][i], ...fila}; return; }
+  const {error} = await sb.from(tabla).update(fila).eq("id", id);
+  if (error) throw error;
+  const i = state[tabla].findIndex(x=>x.id===id); state[tabla][i] = {...state[tabla][i], ...fila};
+}
+async function deleteRow(tabla, id){
+  if (!isDemo){ const {error} = await sb.from(tabla).delete().eq("id", id); if (error) throw error; }
+  state[tabla] = state[tabla].filter(x=>x.id!==id);
+  if (tabla === "proveedores"){
+    state.precios = state.precios.filter(x=>x.proveedor_id!==id);
+    state.compras = state.compras.map(x=> x.proveedor_id===id ? {...x, proveedor_id:null} : x);
+  }
+}
+
+/* =========================================================
+   DATOS DERIVADOS
+========================================================= */
+const provById = id => state.proveedores.find(p=>p.id===id);
+const provName = id => provById(id)?.nombre || "Proveedor eliminado";
+
+function sortFecha(arr){ return [...arr].sort((a,b)=> (a.fecha||"").localeCompare(b.fecha||"") || (a.creado||"").localeCompare(b.creado||"")); }
+
+function gruposDeProductos(){
+  const g = {};
+  for (const p of state.precios){
+    const key = p.producto.trim().toLowerCase();
+    if (!g[key]) g[key] = { producto: p.producto.trim(), unidad: p.unidad || "unidad", items: [] };
+    g[key].items.push(p);
+  }
+  return Object.values(g).sort((a,b)=>a.producto.localeCompare(b.producto));
+}
+function ultimosPorProveedor(items){
+  const m = {};
+  for (const it of sortFecha(items)) m[it.proveedor_id] = it;
+  return Object.values(m).sort((a,b)=>a.precio-b.precio);
+}
+function cambiosDePrecio(){
+  const porSupProd = {};
+  for (const p of state.precios){
+    const k = p.proveedor_id + "::" + p.producto.trim().toLowerCase();
+    (porSupProd[k] ||= []).push(p);
+  }
+  const cambios = [];
+  for (const arr0 of Object.values(porSupProd)){
+    const arr = sortFecha(arr0);
+    for (let i=1;i<arr.length;i++){
+      const antes = arr[i-1].precio, ahora = arr[i].precio;
+      if (antes > 0 && ahora !== antes){
+        cambios.push({ proveedor_id: arr[i].proveedor_id, producto: arr[i].producto, antes, ahora,
+                       pct: (ahora-antes)/antes*100, fecha: arr[i].fecha });
+      }
+    }
+  }
+  return cambios.sort((a,b)=> b.fecha.localeCompare(a.fecha));
+}
+
+/* =========================================================
+   NAVEGACIÓN Y RENDER GENERAL
+========================================================= */
+document.getElementById("nav").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  currentView = b.dataset.view;
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("active", x===b));
+  render();
+});
+
+function render(){
+  const v = document.getElementById("view");
+  if (currentView==="panel") v.innerHTML = viewPanel();
+  if (currentView==="proveedores") v.innerHTML = viewProveedores();
+  if (currentView==="precios") v.innerHTML = viewPrecios();
+  if (currentView==="compras") v.innerHTML = viewCompras();
+  if (currentView==="ajustes") v.innerHTML = viewAjustes();
+}
+function renderConn(){
+  document.getElementById("connBox").innerHTML = isDemo
+    ? `<span class="dot"></span><b>Modo demo</b>&nbsp;· los datos no se guardan`
+    : `<span class="dot on"></span><b>Supabase conectado</b>&nbsp;· datos en línea`;
+}
+function renderBanner(){
+  document.getElementById("demoBanner").innerHTML = isDemo
+    ? `<div class="demo-banner"><b>Estás en modo demo:</b> los datos de ejemplo se reinician al recargar la página. Para guardar de verdad y compartir con tus socios, conectá Supabase desde la pestaña <b>Ajustes</b>.</div>`
+    : "";
+}
+
+function tag(cat){ return `<span class="tag" style="--g:${catColor(cat)}">${esc(cat||"Otros")}</span>`; }
+
+/* =========================================================
+   VISTA: PANEL
+========================================================= */
+function viewPanel(){
+  const mesActual = hoy().slice(0,7);
+  const gastoMes = state.compras.filter(c=>(c.fecha||"").startsWith(mesActual)).reduce((s,c)=>s+Number(c.total||0),0);
+  const cambios = cambiosDePrecio();
+  const hace30 = new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  const aumentos30 = cambios.filter(c=>c.fecha>=hace30 && c.pct>0);
+  const productos = gruposDeProductos();
+
+  const porCat = {};
+  for (const p of state.proveedores) porCat[p.categoria||"Otros"] = (porCat[p.categoria||"Otros"]||0)+1;
+  const maxCat = Math.max(1, ...Object.values(porCat));
+  const barras = Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([cat,n])=>`
+    <div class="barrow">
+      <span class="blabel">${esc(cat)}</span>
+      <div class="btrack"><div class="bfill" style="width:${n/maxCat*100}%;background:${catColor(cat)}"></div></div>
+      <span class="bnum">${n}</span>
+    </div>`).join("") || `<div class="empty">Todavía no cargaste proveedores</div>`;
+
+  const listaCambios = cambios.slice(0,7).map(c=>`
+    <div class="rowline">
+      <div>${esc(c.producto)}<div class="who">${esc(provName(c.proveedor_id))} · ${fmtFecha(c.fecha)}</div></div>
+      <div class="mono" style="text-align:right">${fmtARS.format(c.antes)} → ${fmtARS.format(c.ahora)}
+        <div class="${c.pct>0?'up':'down'}">${c.pct>0?"▲":"▼"} ${fmtPct(c.pct)}</div></div>
+    </div>`).join("") || `<div class="empty">Cuando cargues un precio nuevo de un producto existente, acá vas a ver la variación</div>`;
+
+  const listaCompras = state.compras.slice(0,6).map(c=>`
+    <div class="rowline">
+      <div>${esc(provName(c.proveedor_id))}<div class="who">${fmtFecha(c.fecha)}${c.detalle?` · ${esc(c.detalle)}`:""}</div></div>
+      <span class="mono">${fmtARS.format(c.total)}</span>
+    </div>`).join("") || `<div class="empty">Sin compras registradas</div>`;
+
+  const anticipos = [...state.proveedores].filter(p=>Number(p.antelacion_dias)>0)
+    .sort((a,b)=>b.antelacion_dias-a.antelacion_dias).slice(0,7).map(p=>`
+    <div class="rowline">
+      <div>${esc(p.nombre)}<div class="who">${esc(p.categoria||"Otros")}</div></div>
+      <span class="leadtime">${p.antelacion_dias} día${p.antelacion_dias==1?"":"s"} de antelación</span>
+    </div>`).join("") || `<div class="empty">Cargá la antelación de pedidos en cada proveedor para verla acá</div>`;
+
+  return `
+    <div class="topbar">
+      <div><h1>Panel</h1><p>El estado de tus proveedores de un vistazo.</p></div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Proveedores</div><div class="value">${state.proveedores.length}</div><div class="sub">${Object.keys(porCat).length} categorías</div></div>
+      <div class="kpi"><div class="label">Productos con precio</div><div class="value">${productos.length}</div><div class="sub">${state.precios.length} precios cargados</div></div>
+      <div class="kpi"><div class="label">Gasto este mes</div><div class="value">${fmtARS.format(gastoMes)}</div><div class="sub">${state.compras.filter(c=>(c.fecha||"").startsWith(mesActual)).length} compras</div></div>
+      <div class="kpi"><div class="label">Aumentos (30 días)</div><div class="value">${aumentos30.length}</div><div class="sub">${aumentos30.length?`mayor: ${fmtPct(Math.max(...aumentos30.map(c=>c.pct)))}`:"sin aumentos detectados"}</div></div>
+    </div>
+    <div class="panels">
+      <div class="panel"><h3>Últimas variaciones de precio <span class="count">${cambios.length} en total</span></h3>${listaCambios}</div>
+      <div class="panel"><h3>Proveedores por categoría</h3>${barras}</div>
+      <div class="panel"><h3>Compras recientes</h3>${listaCompras}</div>
+      <div class="panel"><h3>Antelación de pedidos</h3>${anticipos}</div>
+    </div>`;
+}
+
+/* =========================================================
+   VISTA: PROVEEDORES
+========================================================= */
+function viewProveedores(){
+  const cats = ["Todas", ...new Set(state.proveedores.map(p=>p.categoria||"Otros"))];
+  const chips = cats.map(c=>`<button class="chip ${filtroCategoria===c?"active":""}" onclick="setFiltro(decodeURIComponent('${encodeURIComponent(c)}'))">${esc(c)}</button>`).join("");
+
+  const q = busqueda.trim().toLowerCase();
+  const lista = state.proveedores.filter(p =>
+    (filtroCategoria==="Todas" || (p.categoria||"Otros")===filtroCategoria) &&
+    (!q || [p.nombre,p.contacto,p.notas,p.direccion].some(x=>(x||"").toLowerCase().includes(q)))
+  );
+
+  const cards = lista.map(p=>`
+    <div class="supcard">
+      <div class="blob" style="background:${catGrad(p.categoria)}">
+        <span class="blob-cat">${esc(p.categoria||"Otros")}</span>
+        ${Number(p.antelacion_dias)>0?`<span class="blob-lead">${p.antelacion_dias} día${p.antelacion_dias==1?"":"s"} antes</span>`:""}
+      </div>
+      <div class="body">
+        <h4>${esc(p.nombre)}</h4>
+        <div class="meta">
+          ${p.contacto?`<span><b>${esc(p.contacto)}</b>${p.telefono?` · ${esc(p.telefono)}`:""}</span>`:(p.telefono?`<span>${esc(p.telefono)}</span>`:"")}
+          ${p.email?`<span>${esc(p.email)}</span>`:""}
+          ${p.direccion?`<span>${esc(p.direccion)}</span>`:""}
+          ${p.condiciones_pago?`<span>Pago: <b>${esc(p.condiciones_pago)}</b></span>`:""}
+        </div>
+        ${p.notas?`<div style="font-size:13px;color:var(--ink-faint)">${esc(p.notas)}</div>`:""}
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost btn-sm" onclick="openDetalle('${p.id}')">Ver ficha</button>
+        <button class="btn btn-ghost btn-sm" onclick="openFormProveedor('${p.id}')">Editar</button>
+        <span class="spacer"></span>
+        <button class="btn btn-danger btn-sm" onclick="delProveedor('${p.id}')">Borrar</button>
+      </div>
+    </div>`).join("");
+
+  return `
+    <div class="topbar">
+      <div><h1>Proveedores</h1><p>${state.proveedores.length} en total · clic en "Ver ficha" para precios e historial.</p></div>
+      <button class="btn btn-primary" onclick="openFormProveedor()">+ Nuevo proveedor</button>
+    </div>
+    <div class="toolbar">
+      <input type="search" placeholder="Buscar por nombre, contacto, dirección…" value="${esc(busqueda)}" oninput="setBusqueda(this.value)">
+      <div class="chips">${chips}</div>
+    </div>
+    ${cards ? `<div class="grid">${cards}</div>` : `<div class="empty">No hay proveedores que coincidan. ${state.proveedores.length===0?"Empezá agregando el primero con el botón de arriba.":""}</div>`}`;
+}
+function setFiltro(c){ filtroCategoria = c; render(); }
+function setBusqueda(v){ busqueda = v; const scroll = document.activeElement; render(); const inp = document.querySelector('input[type=search]'); if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } }
+
+/* =========================================================
+   VISTA: PRECIOS (comparador)
+========================================================= */
+function viewPrecios(){
+  const grupos = gruposDeProductos();
+  const cards = grupos.map(g=>{
+    const ultimos = ultimosPorProveedor(g.items);
+    const minimo = ultimos[0]?.precio;
+    const chips = ultimos.map((it,i)=>`
+      <div class="pricechip ${it.precio===minimo && ultimos.length>1 ? "best":""}">
+        ${it.precio===minimo && ultimos.length>1 ? `<div class="bestlabel">Mejor precio</div>`:""}
+        <div class="pv">${fmtARS.format(it.precio)}</div>
+        <div class="ps">${esc(provName(it.proveedor_id))} · ${fmtFecha(it.fecha)}</div>
+      </div>`).join("");
+    return `
+      <div class="prodcard">
+        <div class="phead">
+          <h4>${esc(g.producto)} <span class="unit">por ${esc(g.unidad)}</span></h4>
+          <div>
+            <button class="btn btn-ghost btn-sm" onclick="openHistorial(decodeURIComponent('${encodeURIComponent(g.producto.toLowerCase())}'))">Historial</button>
+            <button class="btn btn-ghost btn-sm" onclick="openFormPrecio(decodeURIComponent('${encodeURIComponent(g.producto)}'),decodeURIComponent('${encodeURIComponent(g.unidad)}'))">+ Precio</button>
+          </div>
+        </div>
+        <div class="pricegrid">${chips}</div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="topbar">
+      <div><h1>Precios</h1><p>Comparación entre proveedores con el último precio cargado de cada uno.</p></div>
+      <button class="btn btn-primary" onclick="openFormPrecio()">+ Registrar precio</button>
+    </div>
+    ${cards || `<div class="empty">Todavía no cargaste precios. Registrá el primero y a medida que cargues actualizaciones vas a ver la comparación y el historial de aumentos.</div>`}`;
+}
+
+/* =========================================================
+   VISTA: COMPRAS
+========================================================= */
+function viewCompras(){
+  const filas = state.compras.map(c=>`
+    <tr>
+      <td class="mono">${fmtFecha(c.fecha)}</td>
+      <td>${esc(provName(c.proveedor_id))}</td>
+      <td>${esc(c.detalle||"—")}</td>
+      <td>${esc(c.notas||"")}</td>
+      <td class="num">${fmtARS.format(c.total)}</td>
+      <td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="delCompra('${c.id}')">Borrar</button></td>
+    </tr>`).join("");
+  const total = state.compras.reduce((s,c)=>s+Number(c.total||0),0);
+  return `
+    <div class="topbar">
+      <div><h1>Compras</h1><p>Registro histórico de pedidos realizados · total acumulado: <span class="mono">${fmtARS.format(total)}</span></p></div>
+      <button class="btn btn-primary" onclick="openFormCompra()">+ Registrar compra</button>
+    </div>
+    ${filas ? `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Detalle</th><th>Notas</th><th class="num">Total</th><th></th></tr></thead><tbody>${filas}</tbody></table>`
+            : `<div class="empty">Sin compras registradas todavía.</div>`}`;
+}
+
+/* =========================================================
+   VISTA: AJUSTES
+========================================================= */
+function viewAjustes(){
+  return `
+    <div class="topbar"><div><h1>Ajustes</h1><p>Estado de la conexión y pasos para dejar la app en línea.</p></div></div>
+    <div class="panel" style="max-width:680px">
+      <h3>Conexión de datos</h3>
+      <p style="font-size:14px;margin-bottom:14px">${isDemo
+        ? "La app está en <b>modo demo</b>: los datos viven en la memoria del navegador y se pierden al recargar."
+        : "✅ Conectada a <b>Supabase</b>: los datos se guardan en línea y los comparten todas las personas que usen esta página."}</p>
+      <p style="font-size:14px;line-height:1.8">Para conectarla (una sola vez):<br>
+      1. Creá un proyecto gratuito en <b>supabase.com</b>.<br>
+      2. En el <b>SQL Editor</b> de Supabase, pegá y ejecutá el contenido del archivo <span class="mono">schema.sql</span> incluido en este proyecto.<br>
+      3. En Supabase, andá a <b>Settings → API</b> y copiá la <b>URL</b> y la clave <b>anon public</b>.<br>
+      4. Abrí el archivo <span class="mono">index.html</span>, buscá la sección <b>CONFIGURACIÓN</b> (arriba de todo) y pegá esos dos valores.<br>
+      5. Subí el cambio a GitHub; GitHub Pages publica la nueva versión solo.<br><br>
+      El paso a paso completo, con la publicación en GitHub Pages incluida, está en el <span class="mono">README.md</span> del proyecto.</p>
+    </div>`;
+}
+
+/* =========================================================
+   MODALES Y FORMULARIOS
+========================================================= */
+function openModal(html){ document.getElementById("modalBody").innerHTML = html; document.getElementById("overlay").classList.add("open"); }
+function closeModal(){ document.getElementById("overlay").classList.remove("open"); }
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+function toast(msg, err=false){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show" + (err?" err":"");
+  setTimeout(()=>t.classList.remove("show"), 3200);
+}
+
+/* ---- proveedor ---- */
+function openFormProveedor(id){
+  const p = id ? provById(id) : {};
+  const opts = CATEGORIAS.map(c=>`<option ${p.categoria===c?"selected":""}>${c}</option>`).join("");
+
+  openModal(`
+    <h2>${id?"Editar proveedor":"Nuevo proveedor"}</h2>
+    <div id="formManual">
+      <div class="formgrid">
+        <div class="full"><label class="fl">Nombre *</label><input id="f_nombre" value="${esc(p.nombre)}" placeholder="Tostadores del Sur"></div>
+        <div><label class="fl">Categoría</label><select id="f_categoria">${opts}</select></div>
+        <div><label class="fl">Antelación de pedidos (días)</label><input id="f_antelacion" type="number" min="0" value="${p.antelacion_dias ?? 0}"></div>
+        <div><label class="fl">Persona de contacto</label><input id="f_contacto" value="${esc(p.contacto)}"></div>
+        <div><label class="fl">Teléfono / WhatsApp</label><input id="f_telefono" value="${esc(p.telefono)}"></div>
+        <div><label class="fl">Email</label><input id="f_email" value="${esc(p.email)}"></div>
+        <div><label class="fl">Condiciones de pago</label><input id="f_pago" value="${esc(p.condiciones_pago)}" placeholder="Contado / 30 días / transferencia"></div>
+        <div class="full"><label class="fl">Dirección</label><input id="f_direccion" value="${esc(p.direccion)}"></div>
+        <div class="full"><label class="fl">Notas</label><textarea id="f_notas" rows="3" placeholder="Mínimo de compra, días de reparto, etc.">${esc(p.notas)}</textarea></div>
+      </div>
+      <div class="foot">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveProveedor('${id||""}')">${id?"Guardar cambios":"Agregar proveedor"}</button>
+      </div>
+    </div>`);
+
+}
+
+async function saveProveedor(id){
+  const fila = {
+    nombre: g("f_nombre"), categoria: g("f_categoria"), contacto: g("f_contacto"),
+    telefono: g("f_telefono"), email: g("f_email"), direccion: g("f_direccion"),
+    antelacion_dias: Number(g("f_antelacion"))||0, condiciones_pago: g("f_pago"), notas: g("f_notas"),
+  };
+  if (!fila.nombre){ toast("El nombre es obligatorio", true); return; }
+  try{
+    if (id){ await updateRow("proveedores", id, fila); }
+    else { await insertRow("proveedores", fila); }
+    closeModal(); render();
+    toast(id?"Proveedor actualizado":"Proveedor agregado");
+  }catch(e){ toast("Error al guardar: "+e.message, true); }
+}
+async function delProveedor(id){
+  if (!confirm(`¿Borrar a "${provName(id)}"? También se borran sus precios cargados.`)) return;
+  try{ await deleteRow("proveedores", id); render(); toast("Proveedor borrado"); }
+  catch(e){ toast("Error: "+e.message, true); }
+}
+function g(id){ return document.getElementById(id).value.trim(); }
+
+/* ---- detalle de proveedor ---- */
+function openDetalle(id){
+  const p = provById(id); if(!p) return;
+  const precios = sortFecha(state.precios.filter(x=>x.proveedor_id===id)).reverse();
+  const compras = state.compras.filter(x=>x.proveedor_id===id);
+  const filasP = precios.slice(0,12).map(x=>`<div class="rowline"><div>${esc(x.producto)} <span class="who">/ ${esc(x.unidad||"unidad")}</span></div><span class="mono">${fmtARS.format(x.precio)} <span class="who">${fmtFecha(x.fecha)}</span></span></div>`).join("") || `<div class="empty">Sin precios cargados</div>`;
+  const filasC = compras.slice(0,8).map(x=>`<div class="rowline"><div>${fmtFecha(x.fecha)}<div class="who">${esc(x.detalle||"")}</div></div><span class="mono">${fmtARS.format(x.total)}</span></div>`).join("") || `<div class="empty">Sin compras registradas</div>`;
+  openModal(`
+    <h2 style="margin-bottom:6px">${esc(p.nombre)}</h2>
+    <div style="margin-bottom:12px">${tag(p.categoria)}</div>
+    <div style="font-size:14px;color:var(--ink-soft);line-height:1.8">
+      ${p.contacto?`Contacto: <b style="color:var(--ink)">${esc(p.contacto)}</b><br>`:""}
+      ${p.telefono?`Teléfono: ${esc(p.telefono)}<br>`:""}
+      ${p.email?`Email: ${esc(p.email)}<br>`:""}
+      ${p.direccion?`Dirección: ${esc(p.direccion)}<br>`:""}
+      ${p.condiciones_pago?`Pago: ${esc(p.condiciones_pago)}<br>`:""}
+      ${Number(p.antelacion_dias)>0?`Antelación de pedidos: <b style="color:var(--ink)">${p.antelacion_dias} días</b><br>`:""}
+      ${p.notas?`Notas: ${esc(p.notas)}`:""}
+    </div>
+    <div class="detail-block"><h5>Últimos precios</h5>${filasP}</div>
+    <div class="detail-block"><h5>Compras</h5>${filasC}</div>
+    <div class="foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-primary" onclick="openFormProveedor('${p.id}')">Editar</button>
+    </div>`);
+}
+
+/* ---- precio ---- */
+function openFormPrecio(producto="", unidad=""){
+  if (!state.proveedores.length){ toast("Primero agregá al menos un proveedor", true); return; }
+  const opts = state.proveedores.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join("");
+  const productosExistentes = [...new Set(state.precios.map(x=>x.producto.trim()))];
+  openModal(`
+    <h2>Registrar precio</h2>
+    <div class="formgrid">
+      <div class="full"><label class="fl">Proveedor *</label><select id="f_prov">${opts}</select></div>
+      <div><label class="fl">Producto *</label><input id="f_producto" list="dl_prod" value="${esc(producto)}" placeholder="Café en grano">
+        <datalist id="dl_prod">${productosExistentes.map(x=>`<option value="${esc(x)}">`).join("")}</datalist></div>
+      <div><label class="fl">Unidad</label><input id="f_unidad" value="${esc(unidad)}" placeholder="kg / litro / docena / pack"></div>
+      <div><label class="fl">Precio (ARS) *</label><input id="f_precio" type="number" min="0" step="0.01" placeholder="0"></div>
+      <div><label class="fl">Fecha</label><input id="f_fecha" type="date" value="${hoy()}"></div>
+    </div>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px">Consejo: usá siempre el mismo nombre de producto (el campo sugiere los ya cargados). Así la app puede comparar proveedores y calcular los aumentos.</p>
+    <div class="foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePrecio()">Guardar precio</button>
+    </div>`);
+}
+async function savePrecio(){
+  const fila = { proveedor_id: g("f_prov"), producto: g("f_producto"), unidad: g("f_unidad")||"unidad",
+                 precio: Number(g("f_precio")), fecha: g("f_fecha")||hoy() };
+  if (!fila.producto || !(fila.precio>0)){ toast("Completá producto y precio", true); return; }
+  try{ await insertRow("precios", fila); closeModal(); render(); toast("Precio guardado"); }
+  catch(e){ toast("Error al guardar: "+e.message, true); }
+}
+
+/* ---- historial de un producto ---- */
+function openHistorial(keyLower){
+  const items = sortFecha(state.precios.filter(x=>x.producto.trim().toLowerCase()===keyLower));
+  if (!items.length) return;
+  const nombre = items[0].producto;
+
+  // sparkline simple del precio mínimo por fecha
+  const puntos = items.map(x=>({f:x.fecha, v:x.precio}));
+  const vals = puntos.map(p=>p.v), min = Math.min(...vals), max = Math.max(...vals);
+  const W=560, H=70, pad=6;
+  const path = puntos.map((p,i)=>{
+    const x = pad + (puntos.length===1?W/2:(i/(puntos.length-1))*(W-2*pad));
+    const y = max===min ? H/2 : pad + (1-(p.v-min)/(max-min))*(H-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+
+  const filas = [...items].reverse().map((x,i,arr)=>{
+    // delta contra el registro anterior del MISMO proveedor
+    const previos = items.filter(y=>y.proveedor_id===x.proveedor_id && (y.fecha<x.fecha || (y.fecha===x.fecha && (y.creado||"")<(x.creado||""))));
+    const prev = previos[previos.length-1];
+    const delta = prev && prev.precio>0 ? (x.precio-prev.precio)/prev.precio*100 : null;
+    return `<tr>
+      <td class="mono">${fmtFecha(x.fecha)}</td>
+      <td>${esc(provName(x.proveedor_id))}</td>
+      <td class="num">${fmtARS.format(x.precio)}</td>
+      <td class="num">${delta===null?"—":`<span class="${delta>0?'up':delta<0?'down':''}">${delta>0?"▲":delta<0?"▼":""} ${fmtPct(delta)}</span>`}</td>
+      <td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="delPrecio('${x.id}',decodeURIComponent('${encodeURIComponent(keyLower)}'))">×</button></td>
+    </tr>`;
+  }).join("");
+
+  openModal(`
+    <h2>Historial: ${esc(nombre)}</h2>
+    <svg class="spark" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Evolución del precio">
+      <polyline points="${path}" fill="none" stroke="#1E4034" stroke-width="2"/>
+      ${puntos.map((p,i)=>{const x=pad+(puntos.length===1?W/2:(i/(puntos.length-1))*(W-2*pad));const y=max===min?H/2:pad+(1-(p.v-min)/(max-min))*(H-2*pad);return `<circle cx="${x}" cy="${y}" r="3" fill="#D9A03F"/>`}).join("")}
+    </svg>
+    <table><thead><tr><th>Fecha</th><th>Proveedor</th><th class="num">Precio</th><th class="num">Variación</th><th></th></tr></thead><tbody>${filas}</tbody></table>
+    <div class="foot"><button class="btn btn-ghost" onclick="closeModal()">Cerrar</button></div>`);
+}
+async function delPrecio(id, keyLower){
+  try{ await deleteRow("precios", id); render();
+       const quedan = state.precios.some(x=>x.producto.trim().toLowerCase()===keyLower);
+       quedan ? openHistorial(keyLower) : closeModal();
+  }catch(e){ toast("Error: "+e.message, true); }
+}
+
+/* ---- compra ---- */
+function openFormCompra(){
+  if (!state.proveedores.length){ toast("Primero agregá al menos un proveedor", true); return; }
+  const opts = state.proveedores.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join("");
+  openModal(`
+    <h2>Registrar compra</h2>
+    <div class="formgrid">
+      <div><label class="fl">Proveedor *</label><select id="f_prov">${opts}</select></div>
+      <div><label class="fl">Fecha</label><input id="f_fecha" type="date" value="${hoy()}"></div>
+      <div><label class="fl">Total (ARS) *</label><input id="f_total" type="number" min="0" step="0.01"></div>
+      <div><label class="fl">Detalle</label><input id="f_detalle" placeholder="10 kg café + 2 cajas de leche"></div>
+      <div class="full"><label class="fl">Notas</label><input id="f_notas" placeholder="Pagado por transferencia, entrega el viernes…"></div>
+    </div>
+    <div class="foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCompra()">Guardar compra</button>
+    </div>`);
+}
+async function saveCompra(){
+  const fila = { proveedor_id: g("f_prov"), fecha: g("f_fecha")||hoy(), total: Number(g("f_total")),
+                 detalle: g("f_detalle"), notas: g("f_notas") };
+  if (!(fila.total>0)){ toast("Ingresá el total de la compra", true); return; }
+  try{
+    await insertRow("compras", fila);
+    state.compras.sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+    closeModal(); render(); toast("Compra registrada");
+  }catch(e){ toast("Error al guardar: "+e.message, true); }
+}
+async function delCompra(id){
+  if (!confirm("¿Borrar esta compra?")) return;
+  try{ await deleteRow("compras", id); render(); toast("Compra borrada"); }
+  catch(e){ toast("Error: "+e.message, true); }
+}
+
+/* =========================================================
+   DATOS DEMO
+========================================================= */
+function loadDemoData(){
+  const d = n => new Date(Date.now()-n*864e5).toISOString().slice(0,10);
+  const P = (nombre,categoria,extra)=>({ id: crypto.randomUUID(), nombre, categoria, ...extra });
+  const tostador = P("Tostadores del Sur","Café",{contacto:"Marcos Ferreyra",telefono:"11 5555-1234",email:"ventas@tostadoresdelsur.com",direccion:"Av. Caseros 2410, CABA",antelacion_dias:7,condiciones_pago:"50% seña, resto contra entrega",notas:"Mínimo 5 kg por pedido. Tuestan martes y jueves."});
+  const lacteos  = P("Lácteos Pampa","Lácteos",{contacto:"Romina",telefono:"11 4444-8890",direccion:"Mercado Central, Nave 7",antelacion_dias:2,condiciones_pago:"Contado",notas:"Reparten lunes, miércoles y viernes por la mañana."});
+  const pan      = P("Panificados Don Mario","Panificados",{contacto:"Mario",telefono:"11 6666-2211",antelacion_dias:1,condiciones_pago:"Cuenta corriente semanal",notas:"Medialunas excelentes; avisar antes de las 18 h."});
+  const desc     = P("Descartables Once","Descartables",{telefono:"11 7777-9090",direccion:"Lavalle 2300, CABA",antelacion_dias:3,condiciones_pago:"Transferencia",notas:"Mejor precio en vasos 8 oz comprando 10 packs."});
+  const verdu    = P("El Galpón Orgánico","Frutas y verduras",{contacto:"Caro",telefono:"11 3333-4567",antelacion_dias:1,condiciones_pago:"Contado"});
+  const bebidas  = P("Bebidas Patagonia","Bebidas",{contacto:"Federico",email:"fede@bebidaspatagonia.ar",antelacion_dias:4,condiciones_pago:"30 días fecha factura"});
+  state.proveedores = [tostador,lacteos,pan,desc,verdu,bebidas];
+
+  const pr = (prov,producto,unidad,precio,fecha)=>({id:crypto.randomUUID(),proveedor_id:prov.id,producto,unidad,precio,fecha});
+  state.precios = [
+    pr(tostador,"Café en grano blend","kg",14500,d(90)), pr(tostador,"Café en grano blend","kg",16200,d(45)), pr(tostador,"Café en grano blend","kg",17800,d(8)),
+    pr(tostador,"Café de especialidad","kg",24000,d(60)), pr(tostador,"Café de especialidad","kg",26500,d(10)),
+    pr(lacteos,"Leche entera","litro",1350,d(70)), pr(lacteos,"Leche entera","litro",1480,d(20)),
+    pr(verdu,"Leche entera","litro",1520,d(15)),
+    pr(lacteos,"Leche de almendras","litro",3900,d(30)),
+    pr(pan,"Medialunas","docena",6200,d(50)), pr(pan,"Medialunas","docena",6800,d(5)),
+    pr(desc,"Vasos 8 oz","pack x50",4100,d(40)), pr(desc,"Vasos 8 oz","pack x50",4600,d(6)),
+    pr(desc,"Tapas para vaso","pack x50",2300,d(40)),
+    pr(bebidas,"Agua mineral 500ml","pack x12",5400,d(25)),
+  ];
+
+  const c = (prov,fecha,total,detalle,notas)=>({id:crypto.randomUUID(),proveedor_id:prov.id,fecha,total,detalle,notas});
+  state.compras = [
+    c(tostador,d(8),89000,"5 kg blend","Entrega el jueves"),
+    c(lacteos,d(6),29600,"20 L leche entera",""),
+    c(pan,d(3),13600,"2 docenas medialunas","Cuenta corriente"),
+    c(desc,d(12),46000,"10 packs vasos 8 oz","Precio mayorista"),
+    c(tostador,d(40),81000,"5 kg blend",""),
+  ].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+}
+
+initData();
+</script>
+</body>
+</html>

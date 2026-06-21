@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mostrador · CRM de proveedores</title>
+<title>OLINDA · Gestión de proveedores</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -168,6 +168,19 @@
   .detail-block{margin-top:20px}
   .detail-block h5{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-0.01em;margin-bottom:9px;color:var(--ink-soft)}
 
+  /* ---------- filas de precios en formulario ---------- */
+  .precio-row{display:grid;grid-template-columns:1fr 90px 120px 32px;gap:7px;margin-bottom:7px;align-items:center}
+  @media(max-width:560px){.precio-row{grid-template-columns:1fr 1fr;}}
+  .precio-row .rm-btn{background:none;border:1px solid var(--line);border-radius:8px;color:var(--ink-soft);font-size:16px;padding:0;height:36px;width:32px;display:flex;align-items:center;justify-content:center}
+  .precio-row .rm-btn:hover{border-color:var(--up);color:var(--up)}
+  .precios-section{background:var(--bg);border-radius:13px;padding:14px;margin-top:4px}
+  .precios-section .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .precios-section .sec-head span{font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+  .pdf-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .pdf-link{font-size:13px;color:var(--ink);text-decoration:underline;font-weight:500}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
   /* ---------- toast ---------- */
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;font-weight:500;display:none;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
   .toast.err{background:var(--up)}
@@ -202,7 +215,7 @@
 <div class="page">
   <header class="hero">
     <div class="hero-top">
-      <div class="brand">Mostrador <span class="wave">👋</span></div>
+      <div class="brand">OLINDA <span class="wave">👋</span></div>
       <nav class="nav" id="nav">
         <button data-view="panel" class="active"><span class="badge">▦</span> Panel</button>
         <button data-view="proveedores"><span class="badge">+</span> Proveedores</button>
@@ -211,7 +224,7 @@
         <button data-view="ajustes"><span class="badge">⚙</span> Ajustes</button>
       </nav>
     </div>
-    <p class="hero-intro" id="heroIntro">Tus proveedores, precios y pedidos ordenados en un solo lugar. <span class="soft">Pegá una conversación o subí un catálogo y la app carga los datos por vos.</span></p>
+    <p class="hero-intro" id="heroIntro">Tus proveedores, precios y pedidos ordenados en un solo lugar.</p>
     <div class="hero-foot">
       <div class="conn" id="connBox"></div>
     </div>
@@ -590,9 +603,33 @@ function toast(msg, err=false){
 }
 
 /* ---- proveedor ---- */
+let _precioRows = [];
+
+function addPrecioRow(prod="", unid="", prec=""){
+  _precioRows.push({ prod, unid, prec });
+  renderPrecioRows();
+}
+function removePrecioRow(i){
+  _precioRows.splice(i, 1);
+  renderPrecioRows();
+}
+function renderPrecioRows(){
+  const container = document.getElementById("precioRowsContainer");
+  if (!container) return;
+  container.innerHTML = _precioRows.map((r, i) => `
+    <div class="precio-row">
+      <input placeholder="Producto (ej: Café en grano)" value="${esc(r.prod)}" oninput="_precioRows[${i}].prod=this.value">
+      <input placeholder="Unidad" value="${esc(r.unid)}" oninput="_precioRows[${i}].unid=this.value">
+      <input type="number" min="0" placeholder="Precio $" value="${esc(r.prec)}" oninput="_precioRows[${i}].prec=this.value">
+      <button class="rm-btn" onclick="removePrecioRow(${i})" title="Quitar">×</button>
+    </div>`).join("");
+}
+
 function openFormProveedor(id){
   const p = id ? provById(id) : {};
+  _precioRows = [];
   const opts = CATEGORIAS.map(c=>`<option ${p.categoria===c?"selected":""}>${c}</option>`).join("");
+  const pdfActual = p.pdf_url ? `<a class="pdf-link" href="${esc(p.pdf_url)}" target="_blank">📄 Ver PDF actual</a>` : "";
 
   openModal(`
     <h2>${id?"Editar proveedor":"Nuevo proveedor"}</h2>
@@ -607,10 +644,27 @@ function openFormProveedor(id){
         <div><label class="fl">Condiciones de pago</label><input id="f_pago" value="${esc(p.condiciones_pago)}" placeholder="Contado / 30 días / transferencia"></div>
         <div class="full"><label class="fl">Dirección</label><input id="f_direccion" value="${esc(p.direccion)}"></div>
         <div class="full"><label class="fl">Notas</label><textarea id="f_notas" rows="3" placeholder="Mínimo de compra, días de reparto, etc.">${esc(p.notas)}</textarea></div>
+        <div class="full">
+          <label class="fl">PDF (catálogo, lista de precios, ficha)</label>
+          <div class="pdf-row">
+            ${pdfActual}
+            <input type="file" id="f_pdf" accept="application/pdf" style="flex:1;min-width:0">
+          </div>
+        </div>
+        <div class="full">
+          <div class="precios-section">
+            <div class="sec-head">
+              <span>Productos y precios</span>
+              <button class="btn btn-ghost btn-sm" type="button" onclick="addPrecioRow()">+ Agregar</button>
+            </div>
+            <div id="precioRowsContainer"></div>
+            <p style="font-size:12px;color:var(--ink-faint);margin-top:6px">Se van a cargar automáticamente en la pestaña Precios al guardar.</p>
+          </div>
+        </div>
       </div>
       <div class="foot">
         <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveProveedor('${id||""}')">${id?"Guardar cambios":"Agregar proveedor"}</button>
+        <button class="btn btn-primary" id="btnSaveProv" onclick="saveProveedor('${id||""}')">${id?"Guardar cambios":"Agregar proveedor"}</button>
       </div>
     </div>`);
 
@@ -623,12 +677,47 @@ async function saveProveedor(id){
     antelacion_dias: Number(g("f_antelacion"))||0, condiciones_pago: g("f_pago"), notas: g("f_notas"),
   };
   if (!fila.nombre){ toast("El nombre es obligatorio", true); return; }
+
+  const btn = document.getElementById("btnSaveProv");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>Guardando…`;
+
   try{
+    // subir PDF si eligieron uno
+    const pdfFile = document.getElementById("f_pdf")?.files?.[0];
+    if (pdfFile && !isDemo){
+      const ext = pdfFile.name.split(".").pop();
+      const path = `${id||"nuevo"}-${Date.now()}.${ext}`;
+      const { data: upData, error: upErr } = await sb.storage.from("proveedores-docs").upload(path, pdfFile, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = sb.storage.from("proveedores-docs").getPublicUrl(path);
+      fila.pdf_url = urlData.publicUrl;
+    }
+
+    let provId = id;
     if (id){ await updateRow("proveedores", id, fila); }
-    else { await insertRow("proveedores", fila); }
+    else {
+      const nuevo = await insertRow("proveedores", fila);
+      provId = nuevo.id;
+    }
+
+    // insertar filas de precios nuevas
+    const preciosValidos = _precioRows.filter(r => r.prod.trim() && Number(r.prec) > 0);
+    for (const r of preciosValidos){
+      await insertRow("precios", {
+        proveedor_id: provId,
+        producto: r.prod.trim(),
+        unidad: r.unid.trim() || "unidad",
+        precio: Number(r.prec),
+        fecha: hoy()
+      });
+    }
+
     closeModal(); render();
     toast(id?"Proveedor actualizado":"Proveedor agregado");
-  }catch(e){ toast("Error al guardar: "+e.message, true); }
+  }catch(e){
+    toast("Error al guardar: "+e.message, true);
+    btn.disabled = false; btn.innerHTML = id?"Guardar cambios":"Agregar proveedor";
+  }
 }
 async function delProveedor(id){
   if (!confirm(`¿Borrar a "${provName(id)}"? También se borran sus precios cargados.`)) return;
@@ -654,7 +743,8 @@ function openDetalle(id){
       ${p.direccion?`Dirección: ${esc(p.direccion)}<br>`:""}
       ${p.condiciones_pago?`Pago: ${esc(p.condiciones_pago)}<br>`:""}
       ${Number(p.antelacion_dias)>0?`Antelación de pedidos: <b style="color:var(--ink)">${p.antelacion_dias} días</b><br>`:""}
-      ${p.notas?`Notas: ${esc(p.notas)}`:""}
+      ${p.notas?`Notas: ${esc(p.notas)}<br>`:""}
+      ${p.pdf_url?`<a class="pdf-link" href="${esc(p.pdf_url)}" target="_blank">📄 Ver PDF</a>`:""}
     </div>
     <div class="detail-block"><h5>Últimos precios</h5>${filasP}</div>
     <div class="detail-block"><h5>Compras</h5>${filasC}</div>

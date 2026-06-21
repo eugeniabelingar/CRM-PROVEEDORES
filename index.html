@@ -169,10 +169,12 @@
   .detail-block h5{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-0.01em;margin-bottom:9px;color:var(--ink-soft)}
 
   /* ---------- filas de precios en formulario ---------- */
-  .precio-row{display:grid;grid-template-columns:1fr 90px 120px 32px;gap:7px;margin-bottom:7px;align-items:center}
-  @media(max-width:560px){.precio-row{grid-template-columns:1fr 1fr;}}
+  .precio-row{display:grid;grid-template-columns:2fr 80px 110px 100px 120px;gap:7px;margin-bottom:4px;align-items:center}
+  .precio-row-2{display:grid;grid-template-columns:130px 1fr 32px;gap:7px;margin-bottom:10px;padding-left:4px}
+  @media(max-width:560px){.precio-row,.precio-row-2{grid-template-columns:1fr 1fr;}}
   .precio-row .rm-btn{background:none;border:1px solid var(--line);border-radius:8px;color:var(--ink-soft);font-size:16px;padding:0;height:36px;width:32px;display:flex;align-items:center;justify-content:center}
   .precio-row .rm-btn:hover{border-color:var(--up);color:var(--up)}
+  .iva-input{background:var(--bg)!important;color:var(--ink-soft)!important;font-weight:600}
   .precios-section{background:var(--bg);border-radius:13px;padding:14px;margin-top:4px}
   .precios-section .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .precios-section .sec-head span{font-size:12.5px;font-weight:600;color:var(--ink-soft)}
@@ -605,22 +607,37 @@ function toast(msg, err=false){
 /* ---- proveedor ---- */
 let _precioRows = [];
 
-function addPrecioRow(prod="", unid="", prec=""){
-  _precioRows.push({ prod, unid, prec });
+function addPrecioRow(prod="", unid="", prec="", fecha="", notas=""){
+  _precioRows.push({ prod, unid, prec, fecha: fecha||hoy(), notas });
   renderPrecioRows();
 }
 function removePrecioRow(i){
   _precioRows.splice(i, 1);
   renderPrecioRows();
 }
+function updateIVA(i){
+  const prec = Number(_precioRows[i].prec) || 0;
+  const ivaEl = document.getElementById("f_iva_"+i);
+  if (ivaEl) ivaEl.value = prec > 0 ? fmtARS.format(prec * 1.21) : "";
+}
 function renderPrecioRows(){
   const container = document.getElementById("precioRowsContainer");
   if (!container) return;
+  if (_precioRows.length === 0){
+    container.innerHTML = `<p style="font-size:12.5px;color:var(--ink-faint);text-align:center;padding:8px 0">Usá "+ Agregar" para cargar productos con precio.</p>`;
+    return;
+  }
   container.innerHTML = _precioRows.map((r, i) => `
     <div class="precio-row">
       <input placeholder="Producto (ej: Café en grano)" value="${esc(r.prod)}" oninput="_precioRows[${i}].prod=this.value">
       <input placeholder="Unidad" value="${esc(r.unid)}" oninput="_precioRows[${i}].unid=this.value">
-      <input type="number" min="0" placeholder="Precio $" value="${esc(r.prec)}" oninput="_precioRows[${i}].prec=this.value">
+      <input type="number" min="0" placeholder="Precio s/IVA" value="${esc(r.prec)}" oninput="_precioRows[${i}].prec=this.value;updateIVA(${i})">
+      <input id="f_iva_${i}" class="iva-input" readonly placeholder="+21% IVA" value="${r.prec>0?fmtARS.format(Number(r.prec)*1.21):""}">
+      <input type="date" value="${esc(r.fecha)}" oninput="_precioRows[${i}].fecha=this.value">
+    </div>
+    <div class="precio-row-2">
+      <div></div>
+      <input placeholder="Notas del precio (opcional)" value="${esc(r.notas)}" oninput="_precioRows[${i}].notas=this.value">
       <button class="rm-btn" onclick="removePrecioRow(${i})" title="Quitar">×</button>
     </div>`).join("");
 }
@@ -643,7 +660,8 @@ function openFormProveedor(id){
         <div><label class="fl">Email</label><input id="f_email" value="${esc(p.email)}"></div>
         <div><label class="fl">Condiciones de pago</label><input id="f_pago" value="${esc(p.condiciones_pago)}" placeholder="Contado / 30 días / transferencia"></div>
         <div class="full"><label class="fl">Dirección</label><input id="f_direccion" value="${esc(p.direccion)}"></div>
-        <div class="full"><label class="fl">Notas</label><textarea id="f_notas" rows="3" placeholder="Mínimo de compra, días de reparto, etc.">${esc(p.notas)}</textarea></div>
+        <div><label class="fl">Mínimo de compra</label><input id="f_minimo" value="${esc(p.minimo_compra)}" placeholder="Ej: 5 kg, $10.000, 1 caja"></div>
+        <div><label class="fl">Notas</label><textarea id="f_notas" rows="2" placeholder="Días de reparto, condiciones especiales, etc.">${esc(p.notas)}</textarea></div>
         <div class="full">
           <label class="fl">PDF (catálogo, lista de precios, ficha)</label>
           <div class="pdf-row">
@@ -674,7 +692,8 @@ async function saveProveedor(id){
   const fila = {
     nombre: g("f_nombre"), categoria: g("f_categoria"), contacto: g("f_contacto"),
     telefono: g("f_telefono"), email: g("f_email"), direccion: g("f_direccion"),
-    antelacion_dias: Number(g("f_antelacion"))||0, condiciones_pago: g("f_pago"), notas: g("f_notas"),
+    antelacion_dias: Number(g("f_antelacion"))||0, condiciones_pago: g("f_pago"),
+    notas: g("f_notas"), minimo_compra: g("f_minimo"),
   };
   if (!fila.nombre){ toast("El nombre es obligatorio", true); return; }
 
@@ -708,7 +727,8 @@ async function saveProveedor(id){
         producto: r.prod.trim(),
         unidad: r.unid.trim() || "unidad",
         precio: Number(r.prec),
-        fecha: hoy()
+        fecha: r.fecha || hoy(),
+        notas: r.notas.trim() || null,
       });
     }
 
@@ -731,7 +751,7 @@ function openDetalle(id){
   const p = provById(id); if(!p) return;
   const precios = sortFecha(state.precios.filter(x=>x.proveedor_id===id)).reverse();
   const compras = state.compras.filter(x=>x.proveedor_id===id);
-  const filasP = precios.slice(0,12).map(x=>`<div class="rowline"><div>${esc(x.producto)} <span class="who">/ ${esc(x.unidad||"unidad")}</span></div><span class="mono">${fmtARS.format(x.precio)} <span class="who">${fmtFecha(x.fecha)}</span></span></div>`).join("") || `<div class="empty">Sin precios cargados</div>`;
+  const filasP = precios.slice(0,12).map(x=>`<div class="rowline"><div>${esc(x.producto)} <span class="who">/ ${esc(x.unidad||"unidad")}</span>${x.notas?`<div class="who">${esc(x.notas)}</div>`:""}</div><span class="mono" style="text-align:right">${fmtARS.format(x.precio)}<br><span style="font-size:11px;color:var(--ink-faint)">+IVA ${fmtARS.format(x.precio*1.21)}</span><br><span class="who">${fmtFecha(x.fecha)}</span></span></div>`).join("") || `<div class="empty">Sin precios cargados</div>`;
   const filasC = compras.slice(0,8).map(x=>`<div class="rowline"><div>${fmtFecha(x.fecha)}<div class="who">${esc(x.detalle||"")}</div></div><span class="mono">${fmtARS.format(x.total)}</span></div>`).join("") || `<div class="empty">Sin compras registradas</div>`;
   openModal(`
     <h2 style="margin-bottom:6px">${esc(p.nombre)}</h2>
@@ -743,6 +763,7 @@ function openDetalle(id){
       ${p.direccion?`Dirección: ${esc(p.direccion)}<br>`:""}
       ${p.condiciones_pago?`Pago: ${esc(p.condiciones_pago)}<br>`:""}
       ${Number(p.antelacion_dias)>0?`Antelación de pedidos: <b style="color:var(--ink)">${p.antelacion_dias} días</b><br>`:""}
+      ${p.minimo_compra?`Mínimo de compra: <b style="color:var(--ink)">${esc(p.minimo_compra)}</b><br>`:""}
       ${p.notas?`Notas: ${esc(p.notas)}<br>`:""}
       ${p.pdf_url?`<a class="pdf-link" href="${esc(p.pdf_url)}" target="_blank">📄 Ver PDF</a>`:""}
     </div>
